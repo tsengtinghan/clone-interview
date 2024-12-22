@@ -1,32 +1,43 @@
 "use server";
 
-import OpenAI from 'openai';
+import OpenAI from "openai";
+import { writeFile } from "fs/promises";
+import path from "path";
+import { v4 as uuidv4 } from "uuid";
 
 const openai = new OpenAI({
-  apiKey: process.env['OPENAI_API_KEY'], 
+  apiKey: process.env["OPENAI_API_KEY"],
 });
 
 export async function chatCompletionAction(messages: any[]) {
-  // Transform your messages array into the format that OpenAI expects:
-  // [
-  //   { role: "user", content: "Hello" },
-  //   { role: "assistant", content: "Hi! How can I help?" },
-  //   ...
-  // ]
   const transformedMessages = messages.map((m) => ({
     role: m.role,
-    content: m.content.map((c: any) => c.text).join(" ")
+    content: m.content.map((c: any) => c.text).join(" "),
   }));
 
   const response = await openai.chat.completions.create({
     model: "gpt-4o",
-    messages: transformedMessages
+    messages: transformedMessages,
   });
 
   const assistantMessage = response.choices[0].message;
-  // Convert the assistant message back into your internal format
+  const messageText = assistantMessage?.content || "";
+
+  const speechFile = `speech-${uuidv4()}.mp3`;
+  const publicPath = path.join(process.cwd(), "public", "audio", speechFile);
+
+  const speechResponse = await openai.audio.speech.create({
+    model: "tts-1",
+    voice: "alloy",
+    input: messageText,
+  });
+
+  const buffer = Buffer.from(await speechResponse.arrayBuffer());
+  await writeFile(publicPath, buffer);
+
   return {
     role: "assistant",
-    content: [{ type: "text", text: assistantMessage?.content || "" }]
+    content: [{ type: "text", text: messageText }],
+    audioUrl: `/audio/${speechFile}`,
   };
 }
