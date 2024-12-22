@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { chatCompletionAction } from "./actions";
+import { useState, useRef } from "react";
+import { chatCompletionAction, transcribeAudioAction } from "./actions";
 import interviewScript from "../../../public/interview_script.json";
 
 export default function TrainingPage() {
@@ -9,6 +9,9 @@ export default function TrainingPage() {
   const [messages, setMessages] = useState<any[]>([]);
   const [userInput, setUserInput] = useState("");
   const [isPlaying, setIsPlaying] = useState(false);
+  const [isRecording, setIsRecording] = useState(false);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
 
   const playAudioStream = async (audioBase64: string) => {
     setIsPlaying(true);
@@ -96,6 +99,56 @@ export default function TrainingPage() {
     }
   };
 
+  const startRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mediaRecorder = new MediaRecorder(stream);
+      mediaRecorderRef.current = mediaRecorder;
+      audioChunksRef.current = [];
+
+      mediaRecorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          audioChunksRef.current.push(event.data);
+        }
+      };
+
+      mediaRecorder.onstop = async () => {
+        const audioBlob = new Blob(audioChunksRef.current, {
+          type: "audio/mp3",
+        });
+
+        // Convert blob to base64
+        const reader = new FileReader();
+        reader.readAsDataURL(audioBlob);
+        reader.onloadend = async () => {
+          const base64Audio = reader.result?.toString().split(",")[1];
+          if (base64Audio) {
+            // Get transcription
+            const transcription = await transcribeAudioAction(base64Audio);
+
+            // Update input with transcription
+            setUserInput(transcription);
+          }
+        };
+
+        // Stop all tracks
+        stream.getTracks().forEach((track) => track.stop());
+      };
+
+      mediaRecorder.start();
+      setIsRecording(true);
+    } catch (error) {
+      console.error("Error starting recording:", error);
+    }
+  };
+
+  const stopRecording = () => {
+    if (mediaRecorderRef.current && isRecording) {
+      mediaRecorderRef.current.stop();
+      setIsRecording(false);
+    }
+  };
+
   return (
     <div>
       <h1>Training Page</h1>
@@ -120,19 +173,65 @@ export default function TrainingPage() {
             ))}
           </div>
 
-          <form onSubmit={handleSend}>
-            <input
-              value={userInput}
-              onChange={(e) => setUserInput(e.target.value)}
-              placeholder="Type your message"
-              disabled={isPlaying}
-            />
-            <button type="submit" disabled={isPlaying}>
+          <form onSubmit={handleSend} className="input-area">
+            <div className="input-group">
+              <input
+                value={userInput}
+                onChange={(e) => setUserInput(e.target.value)}
+                placeholder="Type your message"
+                disabled={isPlaying || isRecording}
+              />
+              <button
+                type="button"
+                onClick={isRecording ? stopRecording : startRecording}
+                disabled={isPlaying}
+                className={isRecording ? "recording" : ""}
+              >
+                {isRecording ? "⏹️ Stop" : "🎤 Record"}
+              </button>
+            </div>
+            <button type="submit" disabled={isPlaying || isRecording}>
               Send
             </button>
           </form>
+
+          {isRecording && (
+            <div className="recording-indicator">Recording... 🔴</div>
+          )}
         </>
       )}
+
+      <style jsx>{`
+        .input-area {
+          display: flex;
+          flex-direction: column;
+          gap: 10px;
+        }
+        .input-group {
+          display: flex;
+          gap: 10px;
+        }
+        .recording {
+          background-color: #ff4444;
+          color: white;
+        }
+        .recording-indicator {
+          margin-top: 10px;
+          color: #ff4444;
+          animation: pulse 1.5s infinite;
+        }
+        @keyframes pulse {
+          0% {
+            opacity: 1;
+          }
+          50% {
+            opacity: 0.5;
+          }
+          100% {
+            opacity: 1;
+          }
+        }
+      `}</style>
     </div>
   );
 }

@@ -36,3 +36,23 @@ export async function chatCompletionAction(messages: any[]) {
     audioData: audioBase64,
   };
 }
+
+export async function transcribeAudioAction(audioBase64: string) {
+  try {
+    // Convert base64 to buffer
+    const audioBuffer = Buffer.from(audioBase64, "base64");
+
+    // Create a File object instead of Blob
+    const file = new File([audioBuffer], "audio.mp3", { type: "audio/mp3" });
+
+    const transcription = await openai.audio.transcriptions.create({
+      file: file,
+      model: "whisper-1",
+    });
+
+    return transcription.text;
+  } catch (error) {
+    console.error("Transcription error:", error);
+    throw error;
+  }
+}
