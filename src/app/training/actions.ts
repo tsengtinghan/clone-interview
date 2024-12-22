@@ -56,3 +56,68 @@ export async function transcribeAudioAction(audioBase64: string) {
     throw error;
   }
 }
+
+export async function summarizeConversationAction(messages: any[]) {
+  const systemMessage = {
+    role: "developer",
+    content: [
+      {
+        type: "text",
+        text: `
+          Analyze the conversation history and create a detailed summary of the person being interviewed.
+          Return the response as a JSON object with the following structure:
+          {
+            "personalInfo": {
+              "name": "if mentioned",
+              "age": "if mentioned",
+              "occupation": "current job",
+              "location": "where they live",
+              "familyStatus": "relationship/family details"
+            },
+            "background": {
+              "education": "educational background",
+              "careerPath": "career progression",
+              "significantLifeEvents": []
+            },
+            "personality": {
+              "traits": [],
+              "values": [],
+              "interests": [],
+              "challenges": "current or past challenges mentioned"
+            },
+            "relationships": {
+              "family": [],
+              "friends": [],
+              "professional": []
+            },
+            "narratives": [
+              {
+                "topic": "topic of the story",
+                "context": "when/where",
+                "details": "key points from their story"
+              }
+            ]
+          }
+          Include only information that was actually mentioned in the conversation.
+          For fields where information wasn't provided, use null or empty arrays.
+        `,
+      },
+    ],
+  };
+
+  const transformedMessages = [
+    systemMessage,
+    ...messages.map((m) => ({
+      role: m.role,
+      content: m.content.map((c: any) => c.text).join(" "),
+    })),
+  ];
+
+  const response = await openai.chat.completions.create({
+    model: "gpt-4o",
+    messages: transformedMessages,
+    response_format: { type: "json_object" },
+  });
+
+  return JSON.parse(response.choices[0].message?.content || "{}");
+}

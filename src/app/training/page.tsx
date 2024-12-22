@@ -1,9 +1,13 @@
 "use client";
 
 import { useState, useRef } from "react";
-import { chatCompletionAction, transcribeAudioAction } from "./actions";
+import {
+  chatCompletionAction,
+  transcribeAudioAction,
+  summarizeConversationAction,
+} from "./actions";
 import interviewScript from "../../../public/interview_script.json";
-import { Mic, Square, Send, Loader2 } from "lucide-react";
+import { Mic, Square, Send, Loader2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
@@ -156,11 +160,60 @@ export default function TrainingPage() {
     }
   };
 
+  const endInterview = async () => {
+    // Filter out developer messages and save only the conversation
+    const conversationHistory = messages.filter(
+      (msg) => msg.role !== "developer"
+    );
+
+    // Save raw conversation
+    localStorage.setItem(
+      "raw_conversation",
+      JSON.stringify(conversationHistory)
+    );
+
+    try {
+      // Get summary from LLM
+      const summary = await summarizeConversationAction(conversationHistory);
+
+      // Save summary
+      localStorage.setItem("conversation_summary", JSON.stringify(summary));
+
+      // Reset states
+      setStarted(false);
+      setMessages([]);
+      setUserInput("");
+      setIsPlaying(false);
+      setIsRecording(false);
+      setIsProcessing(false);
+    } catch (error) {
+      console.error("Error generating summary:", error);
+      // Still end the interview even if summary fails
+      setStarted(false);
+      setMessages([]);
+      setUserInput("");
+    }
+  };
+
   return (
     <div className="min-h-screen bg-white text-black">
       <div className="container mx-auto max-w-3xl px-4 py-8">
         <div className="flex flex-col items-center justify-center space-y-8">
-          <h1 className="text-3xl font-bold tracking-tight">Clone Interview</h1>
+          <div className="w-full flex items-center justify-between">
+            <h1 className="text-3xl font-bold tracking-tight">
+              Clone Interview
+            </h1>
+            {started && (
+              <Button
+                onClick={endInterview}
+                variant="destructive"
+                className="bg-red-500 hover:bg-red-600"
+              >
+                <X className="h-4 w-4 mr-2" />
+                End Interview
+              </Button>
+            )}
+          </div>
 
           {!started ? (
             <Button
