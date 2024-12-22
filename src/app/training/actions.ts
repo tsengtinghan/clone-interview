@@ -60,10 +60,7 @@ export async function transcribeAudioAction(audioBase64: string) {
 export async function summarizeConversationAction(messages: any[]) {
   const systemMessage = {
     role: "developer",
-    content: [
-      {
-        type: "text",
-        text: `
+    content:  `
           Analyze the conversation history and create a detailed summary of the person being interviewed.
           Return the response as a JSON object with the following structure:
           {
@@ -101,8 +98,6 @@ export async function summarizeConversationAction(messages: any[]) {
           Include only information that was actually mentioned in the conversation.
           For fields where information wasn't provided, use null or empty arrays.
         `,
-      },
-    ],
   };
 
   const transformedMessages = [
