@@ -1,9 +1,6 @@
 "use server";
 
 import OpenAI from "openai";
-import { writeFile } from "fs/promises";
-import path from "path";
-import { v4 as uuidv4 } from "uuid";
 
 const openai = new OpenAI({
   apiKey: process.env["OPENAI_API_KEY"],
@@ -20,24 +17,22 @@ export async function chatCompletionAction(messages: any[]) {
     messages: transformedMessages,
   });
 
-  const assistantMessage = response.choices[0].message;
-  const messageText = assistantMessage?.content || "";
+  const messageText = response.choices[0].message?.content || "";
 
-  const speechFile = `speech-${uuidv4()}.mp3`;
-  const publicPath = path.join(process.cwd(), "public", "audio", speechFile);
-
+  // Get audio stream
   const speechResponse = await openai.audio.speech.create({
     model: "tts-1",
     voice: "alloy",
     input: messageText,
   });
 
-  const buffer = Buffer.from(await speechResponse.arrayBuffer());
-  await writeFile(publicPath, buffer);
+  // Convert to base64
+  const audioBuffer = Buffer.from(await speechResponse.arrayBuffer());
+  const audioBase64 = audioBuffer.toString("base64");
 
   return {
     role: "assistant",
     content: [{ type: "text", text: messageText }],
-    audioUrl: `/audio/${speechFile}`,
+    audioData: audioBase64,
   };
 }

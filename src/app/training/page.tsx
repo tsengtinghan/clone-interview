@@ -10,6 +10,31 @@ export default function TrainingPage() {
   const [userInput, setUserInput] = useState("");
   const [isPlaying, setIsPlaying] = useState(false);
 
+  const playAudioStream = async (audioBase64: string) => {
+    setIsPlaying(true);
+
+    try {
+      // Convert base64 back to audio buffer
+      const audioData = Uint8Array.from(atob(audioBase64), (c) =>
+        c.charCodeAt(0)
+      );
+      const audioBlob = new Blob([audioData], { type: "audio/mp3" });
+      const audioUrl = URL.createObjectURL(audioBlob);
+
+      // Play the audio
+      const audioElement = new Audio(audioUrl);
+      audioElement.onended = () => {
+        setIsPlaying(false);
+        URL.revokeObjectURL(audioUrl); // Clean up
+      };
+
+      await audioElement.play();
+    } catch (error) {
+      console.error("Error playing audio:", error);
+      setIsPlaying(false);
+    }
+  };
+
   const startInterview = async () => {
     const systemMessage = {
       role: "developer",
@@ -38,28 +63,21 @@ export default function TrainingPage() {
       ],
     };
 
-    // Initialize conversation with system messages and first question
     const initialMessages = [systemMessage, scriptMessage];
     setMessages(initialMessages);
 
-    // Get AI's first question
     const aiResponse = await chatCompletionAction(initialMessages);
     setMessages([...initialMessages, aiResponse]);
     setStarted(true);
 
-    // Play the audio
-    if (aiResponse.audioUrl) {
-      const audio = new Audio(aiResponse.audioUrl);
-      audio.play();
-      setIsPlaying(true);
-      audio.onended = () => setIsPlaying(false);
+    if (aiResponse.audioData) {
+      await playAudioStream(aiResponse.audioData);
     }
   };
 
   const handleSend = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // 1. Add the new user message to the conversation
     const updatedMessages = [
       ...messages,
       {
@@ -68,22 +86,14 @@ export default function TrainingPage() {
       },
     ];
     setMessages(updatedMessages);
+    setUserInput("");
 
-    // 2. Call the server action to get AI response
     const aiResponse = await chatCompletionAction(updatedMessages);
-
-    // 3. Append the AI response to local messages
     setMessages([...updatedMessages, aiResponse]);
 
-    // Play the audio
-    if (aiResponse.audioUrl) {
-      const audio = new Audio(aiResponse.audioUrl);
-      audio.play();
-      setIsPlaying(true);
-      audio.onended = () => setIsPlaying(false);
+    if (aiResponse.audioData) {
+      await playAudioStream(aiResponse.audioData);
     }
-
-    setUserInput("");
   };
 
   return (
