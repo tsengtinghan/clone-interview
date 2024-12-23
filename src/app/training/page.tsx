@@ -11,6 +11,8 @@ import { Loader2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ChatInterface } from "@/components/chat-interface";
 
+export const runtime = 'edge'
+
 export default function TrainingPage() {
   const [started, setStarted] = useState(false);
   const [messages, setMessages] = useState<any[]>([]);
