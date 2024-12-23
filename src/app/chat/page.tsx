@@ -123,7 +123,7 @@ export default function ChatPage() {
   };
 
   const clearHistory = () => {
-    if (typeof window !== 'undefined') {
+    if (typeof window !== "undefined") {
       localStorage.removeItem("conversation_summary");
       localStorage.removeItem("raw_conversation");
       window.location.reload(); // Reload page after clearing
@@ -146,7 +146,9 @@ export default function ChatPage() {
       <div className="container mx-auto max-w-3xl px-4 py-8">
         <div className="flex flex-col items-center justify-center space-y-8">
           <div className="w-full flex items-center justify-between">
-            <h1 className="text-3xl font-bold tracking-tight">Chat with Clone</h1>
+            <h1 className="text-3xl font-bold tracking-tight">
+              Chat with Clone
+            </h1>
             <button
               onClick={clearHistory}
               className="text-red-500 hover:text-red-600 text-sm"
