@@ -1,3 +1,5 @@
+"use client";
+
 export default function Home() {
   return (
     <div className="min-h-screen bg-white">
@@ -8,9 +10,9 @@ export default function Home() {
           </h1>
 
           <p className="text-lg text-gray-600 max-w-2xl">
-            Create an AI version of yourself that can answer questions
-            in your style. Complete the training process, then chat with your
-            digital clone.
+            Create an AI version of yourself that can answer questions in your
+            style. Complete the training process, then chat with your digital
+            clone.
           </p>
 
           <div className="grid gap-6 w-full max-w-2xl">

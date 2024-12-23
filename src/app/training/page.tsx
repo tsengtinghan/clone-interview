@@ -96,7 +96,6 @@ export default function TrainingPage() {
     }
   };
 
-
   const startRecording = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -151,37 +150,33 @@ export default function TrainingPage() {
   };
 
   const endInterview = async () => {
-    // Filter out developer messages and save only the conversation
     const conversationHistory = messages.filter(
       (msg) => msg.role !== "developer"
     );
 
-    // Save raw conversation
-    localStorage.setItem(
-      "raw_conversation",
-      JSON.stringify(conversationHistory)
-    );
+    if (typeof window !== "undefined") {
+      localStorage.setItem(
+        "raw_conversation",
+        JSON.stringify(conversationHistory)
+      );
 
-    try {
-      // Get summary from LLM
-      const summary = await summarizeConversationAction(conversationHistory);
-
-      // Save summary
-      localStorage.setItem("conversation_summary", JSON.stringify(summary));
-
-      // Reset states
-      setStarted(false);
-      setMessages([]);
-      setUserInput("");
-      setIsPlaying(false);
-      setIsRecording(false);
-      setIsProcessing(false);
-    } catch (error) {
-      console.error("Error generating summary:", error);
-      // Still end the interview even if summary fails
-      setStarted(false);
-      setMessages([]);
-      setUserInput("");
+      try {
+        const summary = await summarizeConversationAction(conversationHistory);
+        localStorage.setItem("conversation_summary", JSON.stringify(summary));
+        // Reset states
+        setStarted(false);
+        setMessages([]);
+        setUserInput("");
+        setIsPlaying(false);
+        setIsRecording(false);
+        setIsProcessing(false);
+      } catch (error) {
+        console.error("Error generating summary:", error);
+        // Still end the interview even if summary fails
+        setStarted(false);
+        setMessages([]);
+        setUserInput("");
+      }
     }
   };
 

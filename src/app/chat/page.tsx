@@ -122,7 +122,10 @@ export default function ChatPage() {
     }
   };
 
-  if (!localStorage.getItem("conversation_summary")) {
+  if (
+    typeof window !== "undefined" &&
+    !localStorage.getItem("conversation_summary")
+  ) {
     return (
       <div className="min-h-screen bg-white flex items-center justify-center">
         <p>No conversation data found. Please complete an interview first.</p>
