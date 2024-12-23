@@ -1,42 +1,49 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
-import { chatWithCloneAction, generateIntroductionAction, transcribeAudioAction } from "./actions";
-import { Mic, Square, Send } from "lucide-react";
+import { useState, useRef } from "react";
+import {
+  chatWithCloneAction,
+  generateIntroductionAction,
+  transcribeAudioAction,
+} from "./actions";
+import { ChatInterface } from "@/components/chat-interface";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Card } from "@/components/ui/card";
+import { Loader2 } from "lucide-react";
 
 export default function ChatPage() {
+  const [started, setStarted] = useState(false);
   const [messages, setMessages] = useState<any[]>([]);
   const [userInput, setUserInput] = useState("");
   const [isPlaying, setIsPlaying] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [isLLMProcessing, setIsLLMProcessing] = useState(false);
   const [summary, setSummary] = useState<any>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
 
-  useEffect(() => {
-    // Load the conversation summary and start chat
-    const initializeChat = async () => {
-      const savedSummary = localStorage.getItem("conversation_summary");
-      if (savedSummary) {
-        const parsedSummary = JSON.parse(savedSummary);
-        setSummary(parsedSummary);
+  const startChat = async () => {
+    const savedSummary = localStorage.getItem("conversation_summary");
+    if (!savedSummary) {
+      return;
+    }
 
-        // Generate introduction based on the summary
-        const introMessage = await generateIntroductionAction(parsedSummary);
-        setMessages([introMessage]);
+    const parsedSummary = JSON.parse(savedSummary);
+    setSummary(parsedSummary);
+    setStarted(true);
+    setIsLLMProcessing(true);
 
-        if (introMessage.audioData) {
-          await playAudioStream(introMessage.audioData);
-        }
+    try {
+      const introMessage = await generateIntroductionAction(parsedSummary);
+      setMessages([introMessage]);
+
+      if (introMessage.audioData) {
+        await playAudioStream(introMessage.audioData);
       }
-    };
-
-    initializeChat();
-  }, []);
+    } finally {
+      setIsLLMProcessing(false);
+    }
+  };
 
   const playAudioStream = async (audioBase64: string) => {
     setIsPlaying(true);
@@ -61,28 +68,6 @@ export default function ChatPage() {
     }
   };
 
-  const handleSend = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!userInput.trim() || !summary) return;
-
-    const updatedMessages = [
-      ...messages,
-      {
-        role: "user",
-        content: [{ type: "text", text: userInput }],
-      },
-    ];
-    setMessages(updatedMessages);
-    setUserInput("");
-
-    const aiResponse = await chatWithCloneAction(updatedMessages, summary);
-    setMessages([...updatedMessages, aiResponse]);
-
-    if (aiResponse.audioData) {
-      await playAudioStream(aiResponse.audioData);
-    }
-  };
-
   const startRecording = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -97,12 +82,12 @@ export default function ChatPage() {
       };
 
       mediaRecorder.onstop = async () => {
-        setIsProcessing(true);
         const audioBlob = new Blob(audioChunksRef.current, {
           type: "audio/mp3",
         });
 
         try {
+          setIsProcessing(true);
           const reader = new FileReader();
           reader.readAsDataURL(audioBlob);
           reader.onloadend = async () => {
@@ -111,11 +96,12 @@ export default function ChatPage() {
               const transcription = await transcribeAudioAction(base64Audio);
               setUserInput(transcription);
             }
+            setIsProcessing(false);
           };
         } catch (error) {
           console.error("Error processing audio:", error);
-        } finally {
           setIsProcessing(false);
+        } finally {
           stream.getTracks().forEach((track) => track.stop());
         }
       };
@@ -131,10 +117,11 @@ export default function ChatPage() {
     if (mediaRecorderRef.current && isRecording) {
       mediaRecorderRef.current.stop();
       setIsRecording(false);
+      setIsProcessing(true);
     }
   };
 
-  if (!summary) {
+  if (!localStorage.getItem("conversation_summary")) {
     return (
       <div className="min-h-screen bg-white flex items-center justify-center">
         <p>No conversation data found. Please complete an interview first.</p>
@@ -148,89 +135,55 @@ export default function ChatPage() {
         <div className="flex flex-col items-center justify-center space-y-8">
           <h1 className="text-3xl font-bold tracking-tight">Chat with Clone</h1>
 
-          <Card className="w-full bg-zinc-900 border-zinc-800">
-            <div className="p-6 space-y-6">
-              {/* Conversation Area */}
-              <div className="space-y-4 max-h-[60vh] overflow-y-auto">
-                {messages.map((msg, idx) => (
-                  <div
-                    key={idx}
-                    className={`flex ${
-                      msg.role === "assistant" ? "justify-start" : "justify-end"
-                    }`}
-                  >
-                    <div
-                      className={`
-                        max-w-[80%] rounded-lg p-4 
-                        ${
-                          msg.role === "assistant"
-                            ? "bg-zinc-800"
-                            : "bg-orange-500"
-                        }
-                      `}
-                    >
-                      <p className="text-sm text-zinc-400 mb-1">
-                        {msg.role === "assistant" ? "Clone" : "You"}
-                      </p>
-                      <p className="text-white">
-                        {msg.content.map((c: any) => c.text).join(" ")}
-                        {isPlaying && msg === messages[messages.length - 1] && (
-                          <span className="ml-2 animate-pulse">🔊</span>
-                        )}
-                      </p>
-                    </div>
-                  </div>
-                ))}
-              </div>
+          {!started ? (
+            <Button
+              onClick={startChat}
+              className="bg-orange-500 hover:bg-orange-600 text-white px-8 py-6 text-lg"
+              disabled={isLLMProcessing}
+            >
+              {isLLMProcessing ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : null}
+              Start Chat
+            </Button>
+          ) : (
+            <ChatInterface
+              messages={messages}
+              isPlaying={isPlaying}
+              isRecording={isRecording}
+              isProcessing={isProcessing}
+              isLLMProcessing={isLLMProcessing}
+              userInput={userInput}
+              onUserInputChange={setUserInput}
+              onSendMessage={async (message) => {
+                const updatedMessages = [
+                  ...messages,
+                  {
+                    role: "user",
+                    content: [{ type: "text", text: message }],
+                  },
+                ];
+                setMessages(updatedMessages);
+                setUserInput("");
 
-              {/* Input Area */}
-              <form onSubmit={handleSend} className="space-y-4">
-                <div className="flex items-center space-x-2">
-                  <Input
-                    value={isProcessing ? "Transcribing..." : userInput}
-                    onChange={(e) => setUserInput(e.target.value)}
-                    placeholder="Type your message..."
-                    disabled={isPlaying || isRecording || isProcessing}
-                    className="flex-1 bg-zinc-800 border-zinc-700 text-white"
-                  />
-                  <Button
-                    type="button"
-                    onClick={isRecording ? stopRecording : startRecording}
-                    disabled={isPlaying || isProcessing}
-                    variant="outline"
-                    className={`
-                      p-3 
-                      ${
-                        isRecording
-                          ? "bg-red-500 hover:bg-red-600 border-red-400"
-                          : "bg-zinc-800 hover:bg-zinc-700 border-zinc-700"
-                      }
-                    `}
-                  >
-                    {isRecording ? (
-                      <Square className="h-5 w-5 text-white" />
-                    ) : (
-                      <Mic className="h-5 w-5 text-white" />
-                    )}
-                  </Button>
-                  <Button
-                    type="submit"
-                    disabled={isPlaying || isRecording}
-                    className="bg-orange-500 hover:bg-orange-600 p-3"
-                  >
-                    <Send className="h-5 w-5" />
-                  </Button>
-                </div>
-              </form>
-
-              {/* Recording Indicator */}
-              {isRecording && (
-                <div className="flex items-center justify-center text-red-500 animate-pulse">
-                  <span className="mr-2">●</span> Recording
-                </div>
-              )}
-            </div>
-          </Card>
+                setIsLLMProcessing(true);
+                try {
+                  const aiResponse = await chatWithCloneAction(
+                    updatedMessages,
+                    summary
+                  );
+                  setMessages([...updatedMessages, aiResponse]);
+                  if (aiResponse.audioData) {
+                    await playAudioStream(aiResponse.audioData);
+                  }
+                } finally {
+                  setIsLLMProcessing(false);
+                }
+              }}
+              onStartRecording={startRecording}
+              onStopRecording={stopRecording}
+            />
+          )}
         </div>
       </div>
     </div>

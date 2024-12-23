@@ -7,10 +7,9 @@ import {
   summarizeConversationAction,
 } from "./actions";
 import interviewScript from "../../../public/interview_script.json";
-import { Mic, Square, Send, Loader2, X } from "lucide-react";
+import { Loader2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Card } from "@/components/ui/card";
+import { ChatInterface } from "@/components/chat-interface";
 
 export default function TrainingPage() {
   const [started, setStarted] = useState(false);
@@ -19,6 +18,7 @@ export default function TrainingPage() {
   const [isPlaying, setIsPlaying] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [isLLMProcessing, setIsLLMProcessing] = useState(false);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
 
@@ -48,6 +48,9 @@ export default function TrainingPage() {
   };
 
   const startInterview = async () => {
+    setStarted(true);
+    setIsLLMProcessing(true);
+
     const systemMessage = {
       role: "developer",
       content: [
@@ -78,35 +81,21 @@ export default function TrainingPage() {
     const initialMessages = [systemMessage, scriptMessage];
     setMessages(initialMessages);
 
-    const aiResponse = await chatCompletionAction(initialMessages);
-    setMessages([...initialMessages, aiResponse]);
-    setStarted(true);
+    try {
+      const aiResponse = await chatCompletionAction(initialMessages);
+      setMessages([...initialMessages, aiResponse]);
 
-    if (aiResponse.audioData) {
-      await playAudioStream(aiResponse.audioData);
+      if (aiResponse.audioData) {
+        await playAudioStream(aiResponse.audioData);
+      }
+    } catch (error) {
+      console.error("Error starting interview:", error);
+      // Optionally handle the error state here
+    } finally {
+      setIsLLMProcessing(false);
     }
   };
 
-  const handleSend = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    const updatedMessages = [
-      ...messages,
-      {
-        role: "user",
-        content: [{ type: "text", text: userInput }],
-      },
-    ];
-    setMessages(updatedMessages);
-    setUserInput("");
-
-    const aiResponse = await chatCompletionAction(updatedMessages);
-    setMessages([...updatedMessages, aiResponse]);
-
-    if (aiResponse.audioData) {
-      await playAudioStream(aiResponse.audioData);
-    }
-  };
 
   const startRecording = async () => {
     try {
@@ -122,12 +111,12 @@ export default function TrainingPage() {
       };
 
       mediaRecorder.onstop = async () => {
-        setIsProcessing(true);
         const audioBlob = new Blob(audioChunksRef.current, {
           type: "audio/mp3",
         });
 
         try {
+          setIsProcessing(true);
           const reader = new FileReader();
           reader.readAsDataURL(audioBlob);
           reader.onloadend = async () => {
@@ -136,11 +125,12 @@ export default function TrainingPage() {
               const transcription = await transcribeAudioAction(base64Audio);
               setUserInput(transcription);
             }
+            setIsProcessing(false);
           };
         } catch (error) {
           console.error("Error processing audio:", error);
-        } finally {
           setIsProcessing(false);
+        } finally {
           stream.getTracks().forEach((track) => track.stop());
         }
       };
@@ -219,101 +209,49 @@ export default function TrainingPage() {
             <Button
               onClick={startInterview}
               className="bg-orange-500 hover:bg-orange-600 text-white px-8 py-6 text-lg"
+              disabled={isLLMProcessing}
             >
+              {isLLMProcessing ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : null}
               Start Interview
             </Button>
           ) : (
-            <Card className="w-full bg-zinc-900 border-zinc-800">
-              <div className="p-6 space-y-6">
-                {/* Conversation Area */}
-                <div className="space-y-4 max-h-[60vh] overflow-y-auto">
-                  {messages.map(
-                    (msg, idx) =>
-                      msg.role !== "developer" && (
-                        <div
-                          key={idx}
-                          className={`flex ${
-                            msg.role === "assistant"
-                              ? "justify-start"
-                              : "justify-end"
-                          }`}
-                        >
-                          <div
-                            className={`
-                          max-w-[80%] rounded-lg p-4 
-                          ${
-                            msg.role === "assistant"
-                              ? "bg-zinc-800"
-                              : "bg-orange-500"
-                          }
-                        `}
-                          >
-                            <p className="text-sm text-zinc-400 mb-1">
-                              {msg.role === "assistant"
-                                ? "AI Interviewer"
-                                : "You"}
-                            </p>
-                            <p className="text-white">
-                              {msg.content.map((c: any) => c.text).join(" ")}
-                              {isPlaying &&
-                                msg === messages[messages.length - 1] && (
-                                  <span className="ml-2 animate-pulse">🔊</span>
-                                )}
-                            </p>
-                          </div>
-                        </div>
-                      )
-                  )}
-                </div>
+            <ChatInterface
+              messages={messages}
+              isPlaying={isPlaying}
+              isRecording={isRecording}
+              isProcessing={isProcessing}
+              isLLMProcessing={isLLMProcessing}
+              userInput={userInput}
+              onUserInputChange={setUserInput}
+              onSendMessage={async (message) => {
+                const updatedMessages = [
+                  ...messages,
+                  {
+                    role: "user",
+                    content: [{ type: "text", text: message }],
+                  },
+                ];
+                setMessages(updatedMessages);
+                setUserInput("");
 
-                {/* Input Area */}
-                <form onSubmit={handleSend} className="space-y-4">
-                  <div className="flex items-center space-x-2">
-                    <Input
-                      value={isProcessing ? "Transcribing..." : userInput}
-                      onChange={(e) => setUserInput(e.target.value)}
-                      placeholder="Type your response..."
-                      disabled={isPlaying || isRecording || isProcessing}
-                      className="flex-1 bg-zinc-800 border-zinc-700 text-white"
-                    />
-                    <Button
-                      type="button"
-                      onClick={isRecording ? stopRecording : startRecording}
-                      disabled={isPlaying || isProcessing}
-                      variant="outline"
-                      className={`
-                        p-3 
-                        ${
-                          isRecording
-                            ? "bg-red-500 hover:bg-red-600 border-red-400"
-                            : "bg-zinc-800 hover:bg-zinc-700 border-zinc-700"
-                        }
-                      `}
-                    >
-                      {isRecording ? (
-                        <Square className="h-5 w-5 text-white" />
-                      ) : (
-                        <Mic className="h-5 w-5 text-white" />
-                      )}
-                    </Button>
-                    <Button
-                      type="submit"
-                      disabled={isPlaying || isRecording}
-                      className="bg-orange-500 hover:bg-orange-600 p-3"
-                    >
-                      <Send className="h-5 w-5" />
-                    </Button>
-                  </div>
-                </form>
-
-                {/* Recording Indicator */}
-                {isRecording && (
-                  <div className="flex items-center justify-center text-red-500 animate-pulse">
-                    <span className="mr-2">●</span> Recording
-                  </div>
-                )}
-              </div>
-            </Card>
+                setIsLLMProcessing(true);
+                try {
+                  const aiResponse = await chatCompletionAction(
+                    updatedMessages
+                  );
+                  setMessages([...updatedMessages, aiResponse]);
+                  if (aiResponse.audioData) {
+                    await playAudioStream(aiResponse.audioData);
+                  }
+                } finally {
+                  setIsLLMProcessing(false);
+                }
+              }}
+              onStartRecording={startRecording}
+              onStopRecording={stopRecording}
+            />
           )}
         </div>
       </div>
