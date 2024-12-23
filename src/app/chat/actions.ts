@@ -7,10 +7,7 @@ const openai = new OpenAI({
   apiKey: process.env["OPENAI_API_KEY"],
 });
 
-export async function chatWithCloneAction(
-  messages: ChatMessage[],
-  summary: any
-) {
+export async function chatWithCloneAction(messages: any[], summary: any) {
   // Create system message that instructs the AI how to behave based on the summary
   const systemMessage = {
     role: "developer",
@@ -86,7 +83,7 @@ export async function transcribeAudioAction(audioBase64: string) {
 }
 
 export async function generateIntroductionAction(summary: any) {
-  const systemMessage = [
+  const systemMessage: { role: any; content: any }[] = [
     {
       role: "developer",
       content: `You are a digital clone of a person with the following characteristics:
