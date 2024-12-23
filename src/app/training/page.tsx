@@ -189,7 +189,7 @@ export default function TrainingPage() {
     <div className="min-h-screen bg-white text-black">
       <div className="container mx-auto max-w-3xl px-4 py-8">
         <div className="flex flex-col items-center justify-center space-y-8">
-          <div className="w-full flex items-center justify-between">
+          <div className="w-full flex items-center justify-center">
             <h1 className="text-3xl font-bold tracking-tight">
               Clone Interview
             </h1>
