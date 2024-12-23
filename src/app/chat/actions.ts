@@ -1,12 +1,16 @@
 "use server";
 
 import OpenAI from "openai";
+import { ChatMessage } from "@/lib/type";
 
 const openai = new OpenAI({
   apiKey: process.env["OPENAI_API_KEY"],
 });
 
-export async function chatWithCloneAction(messages: any[], summary: any) {
+export async function chatWithCloneAction(
+  messages: ChatMessage[],
+  summary: any
+) {
   // Create system message that instructs the AI how to behave based on the summary
   const systemMessage = {
     role: "developer",
@@ -62,34 +66,36 @@ export async function chatWithCloneAction(messages: any[], summary: any) {
 }
 
 export async function transcribeAudioAction(audioBase64: string) {
-    try {
-      // Convert base64 to buffer
-      const audioBuffer = Buffer.from(audioBase64, "base64");
-  
-      // Create a File object instead of Blob
-      const file = new File([audioBuffer], "audio.mp3", { type: "audio/mp3" });
-  
-      const transcription = await openai.audio.transcriptions.create({
-        file: file,
-        model: "whisper-1",
-      });
-  
-      return transcription.text;
-    } catch (error) {
-      console.error("Transcription error:", error);
-      throw error;
-    }
+  try {
+    // Convert base64 to buffer
+    const audioBuffer = Buffer.from(audioBase64, "base64");
+
+    // Create a File object instead of Blob
+    const file = new File([audioBuffer], "audio.mp3", { type: "audio/mp3" });
+
+    const transcription = await openai.audio.transcriptions.create({
+      file: file,
+      model: "whisper-1",
+    });
+
+    return transcription.text;
+  } catch (error) {
+    console.error("Transcription error:", error);
+    throw error;
   }
+}
 
 export async function generateIntroductionAction(summary: any) {
-  const systemMessage = [{
-    role: "developer",
-    content: `You are a digital clone of a person with the following characteristics:
+  const systemMessage = [
+    {
+      role: "developer",
+      content: `You are a digital clone of a person with the following characteristics:
       ${JSON.stringify(summary, null, 2)}
       
       Generate a short introduction of yourself to someone who wants to chat 
-      with you. Include relevant personal details. Make it conversational and inviting, but the introduction should just be one or two sentence max.`
-  }];
+      with you. Include relevant personal details. Make it conversational and inviting, but the introduction should just be one or two sentence max.`,
+    },
+  ];
 
   const response = await openai.chat.completions.create({
     model: "gpt-4o",

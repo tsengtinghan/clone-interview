@@ -9,10 +9,11 @@ import {
 import { ChatInterface } from "@/components/chat-interface";
 import { Button } from "@/components/ui/button";
 import { Loader2 } from "lucide-react";
+import { ChatMessage } from "@/lib/type";
 
 export default function ChatPage() {
   const [started, setStarted] = useState(false);
-  const [messages, setMessages] = useState<any[]>([]);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [userInput, setUserInput] = useState("");
   const [isPlaying, setIsPlaying] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
